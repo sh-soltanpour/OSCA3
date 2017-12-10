@@ -1,0 +1,1 @@
+Func(in1, in2, in3) = in2 + sqrt( abs( in2^2- 4*in1*in3))/ (2*in1+ sin( in1*pi))
