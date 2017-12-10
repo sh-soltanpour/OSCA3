@@ -94,16 +94,15 @@ void *neuron(void *params) {
   int index = *((int *)&params);
   hiddenOutput[index] = tanh(x * weight1[index][0] + y * weight1[index][1] +
                              z * weight1[index][2] + bias1[index]);
-  // hiddenOutput[index] = index;
 }
 void *outputLayer(void *params) {
   while (true) {
     if (hiddenLayerFinished) {
+      sem_post(begin_variance_calc);
       outputLayerFinished = true;
       return NULL;
     }
     sem_wait(begin_output_layer);
-    // cout << "x_temp = " << x_temp << endl;
     x_temp2 = x_temp;
     y_temp2 = y_temp;
     z_temp2 = z_temp;
@@ -118,10 +117,6 @@ void *outputLayer(void *params) {
     outfile.close();
     sem_post(begin_calculate_from_output_layer);
     sem_post(begin_variance_calc);
-    if (hiddenLayerFinished) {
-      outputLayerFinished = true;
-      return NULL;
-    }
     sem_wait(begin_output_from_var);
   }
 }
@@ -129,8 +124,9 @@ void *variance_calculator(void *params) {
   int count = 0;
   double variance = 0;
   while (true) {
-    if (hiddenLayerFinished) {
-      cout << sqrt(variance / count);
+    sem_wait(begin_variance_calc);
+    if (outputLayerFinished) {
+      cout << sqrt(variance / count) << endl;
       return NULL;
     }
     double func_res = pow((func(x_temp2, y_temp2, z_temp2) - result), 2);
@@ -139,7 +135,10 @@ void *variance_calculator(void *params) {
     else
       variance = func_res + variance;
     ++count;
-    sem_wait(begin_variance_calc);
+    if (outputLayerFinished) {
+      cout << sqrt(variance / count) << endl;
+      return NULL;
+    }
     sem_post(begin_output_from_var);
   }
 }
@@ -148,7 +147,6 @@ void *hiddenLayer(void *params) {
     sem_wait(begin_calculate);
     pthread_t threads[HIDDENLAYERSIZE];
     pthread_attr_t attr;
-    // cout << "x = " << x << endl;
     x_temp = x;
     y_temp = y;
     z_temp = z;
@@ -226,13 +224,9 @@ int main() {
   pthread_create(&t3, &attr, outputLayer, NULL);
   pthread_create(&t4, &attr, variance_calculator, NULL);
   pthread_join(t1, NULL);
-  cout << "1 finished" << endl;
   pthread_join(t2, NULL);
-  cout << "2 finished" << endl;
   pthread_join(t3, NULL);
-  cout << "3 finished" << endl;
   pthread_join(t4, NULL);
-  cout << "4 finished" << endl;
 
   return 0;
 }
