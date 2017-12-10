@@ -36,14 +36,26 @@ double bias2 = -52.815634642162856;
 
 bool inputLayerFinished = false;
 bool hiddenLayerFinished = false;
+bool outputLayerFinished = false;
 
 sem_t *s;
 sem_t *begin_calculate;
 sem_t *begin_output_layer;
 sem_t *begin_calculate_from_output_layer;
+sem_t *begin_variance_calc;
+sem_t *begin_output_from_var;
 
 double x, y, z;
+double x_temp, y_temp, z_temp;
+double x_temp2, y_temp2, z_temp2;
+double result;
+
 double hiddenOutput[HIDDENLAYERSIZE];
+
+double func(double in1, double in2, double in3) {
+  return (in2 +
+          sqrt(abs(in2 * in2 - 4 * in1 * in3)) / (2 * in1 + sin(in1 * pi)));
+}
 
 vector<string> split_by_space(string str) {
   istringstream buf(str);
@@ -58,8 +70,8 @@ void *inputLayer(void *) {
     double temp_input[3];
     if (myfile.is_open()) {
       if (!myfile.good()) {
-        sem_post(begin_calculate);
         inputLayerFinished = true;
+        sem_post(begin_calculate);
         return NULL;
       }
       string line;
@@ -87,9 +99,13 @@ void *neuron(void *params) {
 void *outputLayer(void *params) {
   while (true) {
     sem_wait(begin_output_layer);
+    // cout << "x_temp = " << x_temp << endl;
+    x_temp2 = x_temp;
+    y_temp2 = y_temp;
+    z_temp2 = z_temp;
     ofstream outfile;
     outfile.open("output.txt", std::ios_base::app);
-    double result = 0;
+    result = 0;
     for (int i = 0; i < HIDDENLAYERSIZE; i++) {
       result += hiddenOutput[i] * weight2[i];
     }
@@ -97,8 +113,30 @@ void *outputLayer(void *params) {
     outfile << result << endl;
     outfile.close();
     sem_post(begin_calculate_from_output_layer);
-    if (hiddenLayerFinished)
+    sem_post(begin_variance_calc);
+    if (hiddenLayerFinished) {
+      outputLayerFinished = true;
       return NULL;
+    }
+    sem_wait(begin_output_from_var);
+  }
+}
+void *variance_calculator(void *params) {
+  int count = 0;
+  double variance = 0;
+  while (true) {
+    if (hiddenLayerFinished) {
+      cout << sqrt(variance / count);
+      return NULL;
+    }
+    double func_res = pow((func(x_temp2, y_temp2, z_temp2) - result), 2);
+    if (isnan(variance))
+      variance = func_res;
+    else
+      variance = func_res + variance;
+    ++count;
+    sem_wait(begin_variance_calc);
+    sem_post(begin_output_from_var);
   }
 }
 void *hiddenLayer(void *params) {
@@ -106,6 +144,10 @@ void *hiddenLayer(void *params) {
     pthread_t threads[HIDDENLAYERSIZE];
     pthread_attr_t attr;
     sem_wait(begin_calculate);
+    cout << "x = " << x << endl;
+    x_temp = x;
+    y_temp = y;
+    z_temp = z;
     if (inputLayerFinished) {
       hiddenLayerFinished = true;
       return NULL;
@@ -153,15 +195,36 @@ int main() {
     perror("open begin_calculate_from_output_layer");
     return 1;
   }
+  //~~~~~~~~~~~~~
+  sem_unlink("/begin_variance_calc");
+  begin_variance_calc =
+      sem_open("/begin_variance_calc", O_CREAT | O_EXCL, S_IRWXU, 0);
+  if (begin_variance_calc == SEM_FAILED) {
+    perror("open begin_variance_calc");
+    return 1;
+  }
 
-  pthread_t t1, t2, t3;
+  sem_unlink("/begin_output_from_var");
+  begin_output_from_var =
+      sem_open("/begin_output_from_var", O_CREAT | O_EXCL, S_IRWXU, 0);
+  if (begin_output_from_var == SEM_FAILED) {
+    perror("open begin_output_from_var");
+    return 1;
+  }
+
+  //~~~~~~~~~~~~~
+
+  pthread_t t1, t2, t3, t4;
   pthread_attr_t attr;
   pthread_attr_init(&attr);
   pthread_create(&t1, &attr, inputLayer, NULL);
   pthread_create(&t2, &attr, hiddenLayer, NULL);
   pthread_create(&t3, &attr, outputLayer, NULL);
+  pthread_create(&t4, &attr, variance_calculator, NULL);
   pthread_join(t1, NULL);
   pthread_join(t2, NULL);
   pthread_join(t3, NULL);
+  pthread_join(t4, NULL);
+
   return 0;
 }
