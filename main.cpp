@@ -99,7 +99,7 @@ void *neuron(void *params) {
 void *outputLayer(void *params) {
   while (true) {
     sem_wait(begin_output_layer);
-    // cout << "x_temp = " << x_temp << endl;
+    cout << "x_temp = " << x_temp << endl;
     x_temp2 = x_temp;
     y_temp2 = y_temp;
     z_temp2 = z_temp;
@@ -141,9 +141,9 @@ void *variance_calculator(void *params) {
 }
 void *hiddenLayer(void *params) {
   while (true) {
+    sem_wait(begin_calculate);
     pthread_t threads[HIDDENLAYERSIZE];
     pthread_attr_t attr;
-    sem_wait(begin_calculate);
     cout << "x = " << x << endl;
     x_temp = x;
     y_temp = y;
