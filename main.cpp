@@ -98,8 +98,12 @@ void *neuron(void *params) {
 }
 void *outputLayer(void *params) {
   while (true) {
+    if (hiddenLayerFinished) {
+      outputLayerFinished = true;
+      return NULL;
+    }
     sem_wait(begin_output_layer);
-    cout << "x_temp = " << x_temp << endl;
+    // cout << "x_temp = " << x_temp << endl;
     x_temp2 = x_temp;
     y_temp2 = y_temp;
     z_temp2 = z_temp;
@@ -144,7 +148,7 @@ void *hiddenLayer(void *params) {
     sem_wait(begin_calculate);
     pthread_t threads[HIDDENLAYERSIZE];
     pthread_attr_t attr;
-    cout << "x = " << x << endl;
+    // cout << "x = " << x << endl;
     x_temp = x;
     y_temp = y;
     z_temp = z;
@@ -183,16 +187,16 @@ int main() {
   sem_unlink("/begin_output_layer");
   begin_output_layer =
       sem_open("/begin_output_layer", O_CREAT | O_EXCL, S_IRWXU, 0);
-  if (begin_calculate == SEM_FAILED) {
+  if (begin_output_layer == SEM_FAILED) {
     perror("open begin_output_layer");
     return 1;
   }
 
-  sem_unlink("/begin_calculate_from_output_layer");
-  begin_calculate_from_output_layer = sem_open(
-      "/begin_calculate_from_output_layer", O_CREAT | O_EXCL, S_IRWXU, 0);
-  if (begin_calculate == SEM_FAILED) {
-    perror("open begin_calculate_from_output_layer");
+  sem_unlink("/begin_calc_from_out_lay");
+  begin_calculate_from_output_layer =
+      sem_open("/begin_calc_from_out_lay", O_CREAT | O_EXCL, S_IRWXU, 0);
+  if (begin_calculate_from_output_layer == SEM_FAILED) {
+    perror("open begin_calc_from_out_lay");
     return 1;
   }
   //~~~~~~~~~~~~~
@@ -222,9 +226,13 @@ int main() {
   pthread_create(&t3, &attr, outputLayer, NULL);
   pthread_create(&t4, &attr, variance_calculator, NULL);
   pthread_join(t1, NULL);
+  cout << "1 finished" << endl;
   pthread_join(t2, NULL);
+  cout << "2 finished" << endl;
   pthread_join(t3, NULL);
+  cout << "3 finished" << endl;
   pthread_join(t4, NULL);
+  cout << "4 finished" << endl;
 
   return 0;
 }
