@@ -90,6 +90,11 @@ void *inputLayer(void *) {
     sem_wait(begin_input_layer);
   }
 }
+void *neuron(void *params) {
+  int index = *((int *)&params);
+  hiddenOutput[index] = tanh(x * weight1[index][0] + y * weight1[index][1] +
+                             z * weight1[index][2] + bias1[index]);
+}
 void *hiddenLayer(void *params) {
   while (true) {
     sem_wait(begin_calculate);
@@ -114,11 +119,6 @@ void *hiddenLayer(void *params) {
     sem_post(begin_output_layer);
     sem_wait(begin_calculate_from_output_layer);
   }
-}
-void *neuron(void *params) {
-  int index = *((int *)&params);
-  hiddenOutput[index] = tanh(x * weight1[index][0] + y * weight1[index][1] +
-                             z * weight1[index][2] + bias1[index]);
 }
 void *outputLayer(void *params) {
   while (true) {
@@ -168,7 +168,6 @@ void *variance_calculator(void *params) {
     sem_post(begin_output_from_var);
   }
 }
-
 int main() {
   sem_unlink("/begin_input");
   begin_input_layer = sem_open("/begin_input", O_CREAT | O_EXCL, S_IRWXU, 0);
