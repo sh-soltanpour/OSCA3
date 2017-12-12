@@ -38,7 +38,7 @@ bool inputLayerFinished = false;
 bool hiddenLayerFinished = false;
 bool outputLayerFinished = false;
 
-sem_t *s;
+sem_t *begin_input_layer;
 sem_t *begin_calculate;
 sem_t *begin_output_layer;
 sem_t *begin_calculate_from_output_layer;
@@ -87,7 +87,7 @@ void *inputLayer(void *) {
     z = temp_input[2];
     // signal the lock
     sem_post(begin_calculate);
-    sem_wait(s);
+    sem_wait(begin_input_layer);
   }
 }
 void *neuron(void *params) {
@@ -163,17 +163,17 @@ void *hiddenLayer(void *params) {
     for (int i = 0; i < HIDDENLAYERSIZE; i++) {
       pthread_join(threads[i], NULL);
     }
-    sem_post(s);
+    sem_post(begin_input_layer);
     sem_post(begin_output_layer);
     sem_wait(begin_calculate_from_output_layer);
   }
 }
 
 int main() {
-  sem_unlink("/mysemaphore");
-  s = sem_open("/mysemaphore", O_CREAT | O_EXCL, S_IRWXU, 0);
-  if (s == SEM_FAILED) {
-    perror("open mysemaphore");
+  sem_unlink("/begin_input");
+  begin_input_layer = sem_open("/begin_input", O_CREAT | O_EXCL, S_IRWXU, 0);
+  if (begin_input_layer == SEM_FAILED) {
+    perror("open begin_input");
     return 1;
   }
 
