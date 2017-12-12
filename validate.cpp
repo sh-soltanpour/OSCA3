@@ -1,5 +1,8 @@
 #include <cmath>
+#include <fstream>
 #include <iostream>
+#include <sstream>
+#include <vector>
 
 using namespace std;
 double weight1[10][3] = {
@@ -25,18 +28,40 @@ double weight2[10] = {-2.0210328911392796,  1.4925632391411969,
                       -0.54580535770972349, 1.2629238917177057,
                       29.750097611943637,   -11.125476345495747};
 double bias2 = -52.815634642162856;
-
+vector<string> split_by_space(string str) {
+  istringstream buf(str);
+  istream_iterator<string> beg(buf), end;
+  vector<string> tokens(beg, end);
+  return tokens;
+}
 int main() {
-  double x, y, z;
-  cin >> x >> y >> z;
-  double output[10];
-  for (int index = 0; index < 10; index++) {
-    output[index] = tanh(x * weight1[index][0] + y * weight1[index][1] +
-                         z * weight1[index][2] + bias1[index]);
+  ifstream myfile("./documentation/InputFile.txt");
+  if (myfile.is_open()) {
+    while (myfile.good()) {
+      string line;
+      getline(myfile, line);
+      vector<string> words = split_by_space(line);
+      double temp_input[3];
+      for (int i = 0; i < 3; i++) {
+        temp_input[i] = stold(words[i].c_str());
+      }
+      double x, y, z;
+      x = temp_input[0];
+      y = temp_input[1];
+      z = temp_input[2];
+      double output[10];
+      for (int index = 0; index < 10; index++) {
+        output[index] = tanh(x * weight1[index][0] + y * weight1[index][1] +
+                             z * weight1[index][2] + bias1[index]);
+      }
+      double result = bias2;
+      for (int index = 0; index < 10; index++) {
+        result += output[index] * weight2[index];
+      }
+      ofstream outfile;
+      outfile.open("validate_output.txt", std::ios_base::app);
+      outfile << result << endl;
+      outfile.close();
+    }
   }
-  double result = bias2;
-  for (int index = 0; index < 10; index++) {
-    result += output[index] * weight2[index];
-  }
-  cout << result << endl;
 }
