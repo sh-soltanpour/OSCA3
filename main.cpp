@@ -117,6 +117,11 @@ void *outputLayer(void *params) {
     outfile.close();
     sem_post(begin_calculate_from_output_layer);
     sem_post(begin_variance_calc);
+    if (hiddenLayerFinished) {
+      sem_post(begin_variance_calc);
+      outputLayerFinished = true;
+      return NULL;
+    }
     sem_wait(begin_output_from_var);
   }
 }
@@ -135,10 +140,6 @@ void *variance_calculator(void *params) {
     else
       variance = func_res + variance;
     ++count;
-    if (outputLayerFinished) {
-      cout << sqrt(variance / count) << endl;
-      return NULL;
-    }
     sem_post(begin_output_from_var);
   }
 }
@@ -152,6 +153,7 @@ void *hiddenLayer(void *params) {
     z_temp = z;
     if (inputLayerFinished) {
       hiddenLayerFinished = true;
+      sem_post(begin_output_layer);
       return NULL;
     }
     for (int i = 0; i < HIDDENLAYERSIZE; i++) {
@@ -197,7 +199,6 @@ int main() {
     perror("open begin_calc_from_out_lay");
     return 1;
   }
-  //~~~~~~~~~~~~~
   sem_unlink("/begin_variance_calc");
   begin_variance_calc =
       sem_open("/begin_variance_calc", O_CREAT | O_EXCL, S_IRWXU, 0);
@@ -213,8 +214,6 @@ int main() {
     perror("open begin_output_from_var");
     return 1;
   }
-
-  //~~~~~~~~~~~~~
 
   pthread_t t1, t2, t3, t4;
   pthread_attr_t attr;
