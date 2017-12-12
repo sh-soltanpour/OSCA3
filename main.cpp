@@ -90,6 +90,31 @@ void *inputLayer(void *) {
     sem_wait(begin_input_layer);
   }
 }
+void *hiddenLayer(void *params) {
+  while (true) {
+    sem_wait(begin_calculate);
+    pthread_t threads[HIDDENLAYERSIZE];
+    pthread_attr_t attr;
+    x_temp = x;
+    y_temp = y;
+    z_temp = z;
+    if (inputLayerFinished) {
+      hiddenLayerFinished = true;
+      sem_post(begin_output_layer);
+      return NULL;
+    }
+    for (int i = 0; i < HIDDENLAYERSIZE; i++) {
+      pthread_attr_init(&attr);
+      pthread_create(&threads[i], &attr, neuron, (void *)i);
+    }
+    for (int i = 0; i < HIDDENLAYERSIZE; i++) {
+      pthread_join(threads[i], NULL);
+    }
+    sem_post(begin_input_layer);
+    sem_post(begin_output_layer);
+    sem_wait(begin_calculate_from_output_layer);
+  }
+}
 void *neuron(void *params) {
   int index = *((int *)&params);
   hiddenOutput[index] = tanh(x * weight1[index][0] + y * weight1[index][1] +
@@ -141,31 +166,6 @@ void *variance_calculator(void *params) {
       variance = func_res + variance;
     ++count;
     sem_post(begin_output_from_var);
-  }
-}
-void *hiddenLayer(void *params) {
-  while (true) {
-    sem_wait(begin_calculate);
-    pthread_t threads[HIDDENLAYERSIZE];
-    pthread_attr_t attr;
-    x_temp = x;
-    y_temp = y;
-    z_temp = z;
-    if (inputLayerFinished) {
-      hiddenLayerFinished = true;
-      sem_post(begin_output_layer);
-      return NULL;
-    }
-    for (int i = 0; i < HIDDENLAYERSIZE; i++) {
-      pthread_attr_init(&attr);
-      pthread_create(&threads[i], &attr, neuron, (void *)i);
-    }
-    for (int i = 0; i < HIDDENLAYERSIZE; i++) {
-      pthread_join(threads[i], NULL);
-    }
-    sem_post(begin_input_layer);
-    sem_post(begin_output_layer);
-    sem_wait(begin_calculate_from_output_layer);
   }
 }
 
